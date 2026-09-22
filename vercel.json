@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/card-images/:path*",
+      "destination": "https://images.ygoprodeck.com/images/cards/:path*"
+    }
+  ]
+}
