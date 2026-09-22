@@ -8,8 +8,10 @@ const props = defineProps({
   slot: { type: Object, required: true },
   size: { type: String, default: 'main' },
   label: { type: String, default: '' },
+  compact: { type: Boolean, default: false },
 })
 
+const emit = defineEmits(['slot-menu'])
 const store = useComboStore()
 
 const dimensions = computed(() => {
@@ -48,6 +50,10 @@ function onClick() {
     store.setSlotCard(props.slot, store.selectedCard)
   }
 }
+
+function onContextMenu(event) {
+  emit('slot-menu', { event, slot: props.slot })
+}
 </script>
 
 <template>
@@ -56,6 +62,7 @@ function onClick() {
     :class="[
       isActive ? 'border-cyan-500 ring-2 ring-cyan-300' : 'border-zinc-300 hover:border-zinc-500',
       size === 'main' ? 'card-slot-main' : 'card-slot-small',
+      compact ? 'shadow-none' : '',
     ]"
     :style="dimensions"
     draggable="true"
@@ -63,20 +70,21 @@ function onClick() {
     @dragstart="onDragStart"
     @dragover.prevent
     @drop.prevent="onDrop"
+    @contextmenu.prevent.stop="onContextMenu"
   >
     <img
       v-if="card"
       :src="card.imageUrl"
       :alt="card.customName || card.passcode"
-      class="h-full w-full object-cover"
+      class="pointer-events-none h-full w-full object-cover"
       draggable="false"
     >
-    <span v-else class="flex h-full w-full items-center justify-center bg-zinc-100 px-2 text-center text-[11px] font-medium text-zinc-500">
+    <span v-else class="pointer-events-none flex h-full w-full items-center justify-center bg-zinc-100 px-2 text-center text-[11px] font-medium text-zinc-500">
       {{ label || '放入卡片' }}
     </span>
     <span
       v-if="card"
-      class="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/70 px-1.5 py-1 text-[10px] font-semibold text-white opacity-0 transition group-hover:opacity-100"
+      class="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/70 px-1.5 py-1 text-[10px] font-semibold text-white opacity-0 transition group-hover:opacity-100"
     >
       <span>{{ card.customName || card.passcode }}</span>
       <Copy :size="12" />

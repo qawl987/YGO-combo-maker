@@ -40,7 +40,7 @@ function newChainBlock() {
   return {
     id: uid('chain'),
     sourceCard: null,
-    targetCard: null,
+    targetCards: [{ id: uid('target'), card: null }],
   }
 }
 
@@ -51,7 +51,7 @@ function newStep() {
     customActionText: '',
     mainCard: null,
     materials: [newSubCardSlot(), newSubCardSlot()],
-    chainEffects: [],
+    chainEffects: [newChainBlock()],
   }
 }
 
@@ -60,10 +60,10 @@ function createDefaultProject() {
     version: '1.0.0',
     title: '未命名展開',
     gridSettings: {
-      columnsPerRow: 4,
-      mainCardWidth: 140,
+      columnsPerRow: 5,
+      mainCardWidth: 96,
       subCardRatio: 0.5,
-      gapColumnWidth: 80,
+      gapColumnWidth: 44,
     },
     library: [],
     steps: [newStep(), newStep(), newStep(), newStep()],
@@ -93,7 +93,11 @@ function stripRuntimeImageUrls(project) {
     })
     step.chainEffects.forEach((block) => {
       block.sourceCard = normalizeCard(block.sourceCard)
-      block.targetCard = normalizeCard(block.targetCard)
+      block.targetCards = (block.targetCards || []).map((target) => ({
+        ...target,
+        card: normalizeCard(target.card),
+      }))
+      delete block.targetCard
     })
   })
 
@@ -129,7 +133,11 @@ export const useComboStore = defineStore('combo', () => {
   }
 
   async function addCardByPasscode(passcode) {
-    const cleanPasscode = String(passcode).trim()
+    const rawPasscode = String(passcode).trim()
+    if (!/^\d{1,8}$/.test(rawPasscode)) {
+      throw new Error('請輸入 1 到 8 碼數字卡片密碼')
+    }
+    const cleanPasscode = rawPasscode.replace(/^0+/, '') || '0'
     isLoadingCard.value = true
     try {
       const imageUrl = await getCardImage(cleanPasscode)
@@ -163,7 +171,11 @@ export const useComboStore = defineStore('combo', () => {
     } else if (slot.type === 'material') {
       step.materials[slot.materialIndex].card = card
     } else if (slot.type === 'chain') {
-      step.chainEffects[slot.chainIndex][slot.field] = card
+      if (slot.field === 'sourceCard') {
+        step.chainEffects[slot.chainIndex].sourceCard = card
+      } else if (slot.field === 'targetCard') {
+        step.chainEffects[slot.chainIndex].targetCards[slot.targetIndex].card = card
+      }
     }
   }
 
@@ -181,10 +193,6 @@ export const useComboStore = defineStore('combo', () => {
 
   function addStep(afterIndex = project.value.steps.length - 1) {
     project.value.steps.splice(afterIndex + 1, 0, newStep())
-  }
-
-  function insertStepBefore(index) {
-    project.value.steps.splice(index, 0, newStep())
   }
 
   function deleteStep(index) {
@@ -210,13 +218,43 @@ export const useComboStore = defineStore('combo', () => {
     if (slots && slots.length > 1) slots.splice(materialIndex, 1)
   }
 
-  function addChainBlock(stepIndex) {
+  function addChainBlock(stepIndex, afterIndex = null) {
     const blocks = project.value.steps[stepIndex]?.chainEffects
-    if (blocks && blocks.length < 4) blocks.push(newChainBlock())
+    if (!blocks || blocks.length >= 4) return
+    if (afterIndex === null) {
+      blocks.push(newChainBlock())
+    } else {
+      blocks.splice(afterIndex + 1, 0, newChainBlock())
+    }
   }
 
   function removeChainBlock(stepIndex, chainIndex) {
-    project.value.steps[stepIndex]?.chainEffects.splice(chainIndex, 1)
+    const blocks = project.value.steps[stepIndex]?.chainEffects
+    if (!blocks) return
+    if (blocks.length <= 1) {
+      blocks[0] = newChainBlock()
+      return
+    }
+    blocks.splice(chainIndex, 1)
+  }
+
+  function addChainTarget(stepIndex, chainIndex) {
+    const targets = project.value.steps[stepIndex]?.chainEffects[chainIndex]?.targetCards
+    if (targets && targets.length < 4) {
+      targets.push({ id: uid('target'), card: null })
+    }
+  }
+
+  function removeChainTarget(stepIndex, chainIndex, targetIndex = null) {
+    const block = project.value.steps[stepIndex]?.chainEffects[chainIndex]
+    if (!block) return
+    const targets = block.targetCards
+    const removeIndex = targetIndex ?? targets.length - 1
+    if (targets.length <= 1) {
+      targets[0].card = null
+      return
+    }
+    targets.splice(removeIndex, 1)
   }
 
   function saveDraft() {
@@ -252,7 +290,7 @@ export const useComboStore = defineStore('combo', () => {
         ...newStep(),
         ...step,
         materials: step.materials?.length ? step.materials : [newSubCardSlot(), newSubCardSlot()],
-        chainEffects: step.chainEffects || [],
+        chainEffects: step.chainEffects?.length ? step.chainEffects : [newChainBlock()],
       }
       hydrated.mainCard = await hydrateCard(step.mainCard)
       hydrated.materials = await Promise.all(hydrated.materials.map(async (slot) => ({
@@ -264,7 +302,12 @@ export const useComboStore = defineStore('combo', () => {
         ...newChainBlock(),
         ...block,
         sourceCard: await hydrateCard(block.sourceCard),
-        targetCard: await hydrateCard(block.targetCard),
+        targetCards: await Promise.all(
+          (block.targetCards || [{ id: uid('target'), card: block.targetCard || null }]).map(async (target) => ({
+            id: target.id || uid('target'),
+            card: await hydrateCard(target.card),
+          })),
+        ),
       })))
       return hydrated
     }
@@ -299,13 +342,14 @@ export const useComboStore = defineStore('combo', () => {
     pasteSelectedCard,
     clearActiveSlot,
     addStep,
-    insertStepBefore,
     deleteStep,
     clearStep,
     addMaterialSlot,
     removeMaterialSlot,
     addChainBlock,
     removeChainBlock,
+    addChainTarget,
+    removeChainTarget,
     saveDraft,
     loadDraft,
     exportProject,

@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { Download, FileDown, FileUp, ImageDown, Plus, RotateCcw, Search } from '@lucide/vue'
+import { FileDown, FileUp, ImageDown, Plus, RotateCcw, Search, Settings } from '@lucide/vue'
 import { useComboStore } from '../stores/combo'
 
 defineProps({
@@ -11,6 +11,7 @@ const emit = defineEmits(['export-json', 'import-json', 'export-png'])
 const store = useComboStore()
 const passcode = ref('')
 const fileInput = ref(null)
+const settingsOpen = ref(false)
 
 async function addCard() {
   try {
@@ -35,31 +36,13 @@ function triggerImport() {
 <template>
   <aside class="flex h-full w-80 shrink-0 flex-col border-r border-zinc-200 bg-white">
     <div class="border-b border-zinc-200 p-4">
-      <div class="mb-4">
+      <div>
         <p class="text-xs font-bold uppercase text-cyan-700">Deck Lab</p>
         <h2 class="text-xl font-black text-zinc-950">展開一圖流</h2>
       </div>
-
-      <label class="text-xs font-bold text-zinc-600">專案名稱</label>
-      <input v-model="store.project.title" class="mt-1 h-10 w-full rounded-md border border-zinc-300 px-3 text-sm font-semibold" />
-
-      <div class="mt-4 grid grid-cols-3 gap-2">
-        <label class="text-xs font-bold text-zinc-600">
-          每列
-          <input v-model.number="store.project.gridSettings.columnsPerRow" min="2" max="6" type="number" class="mt-1 h-9 w-full rounded border border-zinc-300 px-2">
-        </label>
-        <label class="text-xs font-bold text-zinc-600">
-          主卡
-          <input v-model.number="store.project.gridSettings.mainCardWidth" min="110" max="190" type="number" class="mt-1 h-9 w-full rounded border border-zinc-300 px-2">
-        </label>
-        <label class="text-xs font-bold text-zinc-600">
-          間距
-          <input v-model.number="store.project.gridSettings.gapColumnWidth" min="40" max="180" type="number" class="mt-1 h-9 w-full rounded border border-zinc-300 px-2">
-        </label>
-      </div>
     </div>
 
-    <div class="border-b border-zinc-200 p-4">
+    <div class="p-4">
       <label class="text-xs font-bold text-zinc-600">卡片密碼</label>
       <form class="mt-1 flex gap-2" @submit.prevent="addCard">
         <div class="relative flex-1">
@@ -94,21 +77,54 @@ function triggerImport() {
       </div>
     </div>
 
-    <div class="space-y-2 border-t border-zinc-200 p-4">
-      <button class="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-cyan-700 text-sm font-bold text-white hover:bg-cyan-800" :disabled="exporting" @click="emit('export-png')">
-        <ImageDown :size="16" /> 匯出 PNG
+    <div class="relative border-t border-zinc-200 p-4">
+      <button
+        class="flex h-10 w-10 items-center justify-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm hover:bg-zinc-100"
+        title="設定"
+        @click="settingsOpen = !settingsOpen"
+      >
+        <Settings :size="18" />
       </button>
-      <div class="grid grid-cols-2 gap-2">
-        <button class="flex h-10 items-center justify-center gap-2 rounded-md border border-zinc-300 text-sm font-bold hover:bg-zinc-100" @click="emit('export-json')">
-          <FileDown :size="16" /> JSON
-        </button>
-        <button class="flex h-10 items-center justify-center gap-2 rounded-md border border-zinc-300 text-sm font-bold hover:bg-zinc-100" @click="triggerImport">
-          <FileUp :size="16" /> 匯入
-        </button>
+
+      <div
+        v-if="settingsOpen"
+        class="absolute bottom-16 left-4 z-30 w-72 rounded-xl border border-zinc-200 bg-white p-4 shadow-2xl"
+      >
+        <label class="text-xs font-bold text-zinc-600">專案名稱</label>
+        <input v-model="store.project.title" class="mt-1 h-10 w-full rounded-md border border-zinc-300 px-3 text-sm font-semibold" />
+
+        <div class="mt-4 grid grid-cols-3 gap-2">
+          <label class="text-xs font-bold text-zinc-600">
+            每列
+            <input v-model.number="store.project.gridSettings.columnsPerRow" min="2" max="6" type="number" class="mt-1 h-9 w-full rounded border border-zinc-300 px-2">
+          </label>
+          <label class="text-xs font-bold text-zinc-600">
+            主卡
+            <input v-model.number="store.project.gridSettings.mainCardWidth" min="72" max="180" type="number" class="mt-1 h-9 w-full rounded border border-zinc-300 px-2">
+          </label>
+          <label class="text-xs font-bold text-zinc-600">
+            間距
+            <input v-model.number="store.project.gridSettings.gapColumnWidth" min="24" max="180" type="number" class="mt-1 h-9 w-full rounded border border-zinc-300 px-2">
+          </label>
+        </div>
+
+        <div class="mt-4 space-y-2">
+          <button class="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-cyan-700 text-sm font-bold text-white hover:bg-cyan-800" :disabled="exporting" @click="emit('export-png')">
+            <ImageDown :size="16" /> 匯出 PNG
+          </button>
+          <div class="grid grid-cols-2 gap-2">
+            <button class="flex h-10 items-center justify-center gap-2 rounded-md border border-zinc-300 text-sm font-bold hover:bg-zinc-100" @click="emit('export-json')">
+              <FileDown :size="16" /> 匯出 JSON
+            </button>
+            <button class="flex h-10 items-center justify-center gap-2 rounded-md border border-zinc-300 text-sm font-bold hover:bg-zinc-100" @click="triggerImport">
+              <FileUp :size="16" /> 匯入 JSON
+            </button>
+          </div>
+          <button class="flex h-9 w-full items-center justify-center gap-2 rounded-md text-xs font-bold text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900" @click="store.resetProject">
+            <RotateCcw :size="14" /> 空白專案
+          </button>
+        </div>
       </div>
-      <button class="flex h-9 w-full items-center justify-center gap-2 rounded-md text-xs font-bold text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900" @click="store.resetProject">
-        <RotateCcw :size="14" /> 空白專案
-      </button>
       <input ref="fileInput" class="hidden" type="file" accept="application/json,.json" @change="emit('import-json', $event)">
     </div>
   </aside>

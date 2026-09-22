@@ -1,36 +1,49 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { CornerDownLeft, CornerDownRight } from '@lucide/vue'
+import { CornerDownLeft, CornerDownRight, RotateCcw, ZoomIn } from '@lucide/vue'
 import StepNode from './StepNode.vue'
 import { useComboStore } from '../stores/combo'
 
 const store = useComboStore()
 const canvasRef = ref(null)
+const viewportRef = ref(null)
 const contextMenu = ref(null)
+const zoom = ref(1)
+const isPanning = ref(false)
+const panStart = ref({ x: 0, y: 0, left: 0, top: 0 })
 
 defineExpose({ canvasRef })
+
+const stepCellWidth = computed(() => (
+  store.mainCardWidth + store.subCardWidth * 2 + Number(store.project.gridSettings.gapColumnWidth || 44) + 56
+))
 
 const rows = computed(() => {
   const rowSize = store.columnsPerRow
   const chunks = []
   for (let start = 0; start < store.project.steps.length; start += rowSize) {
     const rowIndex = Math.floor(start / rowSize)
+    const direction = rowIndex % 2 === 0 ? 'ltr' : 'rtl'
     const items = store.project.steps.slice(start, start + rowSize).map((step, offset) => ({
       step,
       index: start + offset,
     }))
-    chunks.push({
-      rowIndex,
-      direction: rowIndex % 2 === 0 ? 'ltr' : 'rtl',
-      items: rowIndex % 2 === 0 ? items : [...items].reverse(),
+    const visualItems = direction === 'ltr' ? items : [...items].reverse()
+    const cells = Array.from({ length: rowSize }, () => null)
+    const offset = direction === 'rtl' ? rowSize - visualItems.length : 0
+    visualItems.forEach((item, itemIndex) => {
+      cells[offset + itemIndex] = item
     })
+    chunks.push({ rowIndex, direction, cells })
   }
   return chunks
 })
 
-function openContextMenu({ event, index }) {
+function openContextMenu({ event, kind, index, slot }) {
   contextMenu.value = {
+    kind,
     index,
+    slot,
     x: event.clientX,
     y: event.clientY,
   }
@@ -42,60 +55,114 @@ function closeContextMenu() {
 
 function runContextAction(action) {
   if (!contextMenu.value) return
-  const index = contextMenu.value.index
+  const payload = contextMenu.value
   closeContextMenu()
-  action(index)
+  action(payload)
+}
+
+function onWheel(event) {
+  if (!event.ctrlKey && !event.metaKey) return
+  event.preventDefault()
+  const delta = event.deltaY > 0 ? -0.08 : 0.08
+  zoom.value = Math.min(1.8, Math.max(0.35, Number((zoom.value + delta).toFixed(2))))
+}
+
+function onPointerDown(event) {
+  if (event.button !== 1) return
+  event.preventDefault()
+  isPanning.value = true
+  panStart.value = {
+    x: event.clientX,
+    y: event.clientY,
+    left: viewportRef.value.scrollLeft,
+    top: viewportRef.value.scrollTop,
+  }
+  viewportRef.value.setPointerCapture(event.pointerId)
+}
+
+function onPointerMove(event) {
+  if (!isPanning.value) return
+  viewportRef.value.scrollLeft = panStart.value.left - (event.clientX - panStart.value.x)
+  viewportRef.value.scrollTop = panStart.value.top - (event.clientY - panStart.value.y)
+}
+
+function onPointerUp(event) {
+  if (!isPanning.value) return
+  isPanning.value = false
+  viewportRef.value.releasePointerCapture(event.pointerId)
+}
+
+function resetZoom() {
+  zoom.value = 1
 }
 </script>
 
 <template>
-  <div class="relative h-full overflow-auto bg-[linear-gradient(#e4e4e7_1px,transparent_1px),linear-gradient(90deg,#e4e4e7_1px,transparent_1px)] bg-[size:28px_28px] p-8" @click="closeContextMenu">
-    <div
-      ref="canvasRef"
-      class="combo-canvas min-w-max rounded-xl bg-zinc-50 p-8 shadow-sm"
-      :style="{ '--main-card-width': `${store.mainCardWidth}px`, '--sub-card-width': `${store.subCardWidth}px` }"
-    >
-      <header class="mb-7 flex items-end justify-between border-b-2 border-zinc-900 pb-3">
-        <div>
-          <p class="text-xs font-bold uppercase tracking-wide text-cyan-700">YGO Combo Flow</p>
-          <h1 class="text-3xl font-black text-zinc-950">{{ store.project.title }}</h1>
-        </div>
-        <p class="text-sm font-semibold text-zinc-500">{{ store.project.steps.length }} Steps</p>
-      </header>
+  <div
+    ref="viewportRef"
+    class="relative h-full overflow-auto bg-[linear-gradient(#e4e4e7_1px,transparent_1px),linear-gradient(90deg,#e4e4e7_1px,transparent_1px)] bg-[size:28px_28px] p-5"
+    :class="isPanning ? 'cursor-grabbing' : 'cursor-default'"
+    @click="closeContextMenu"
+    @wheel="onWheel"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerUp"
+  >
+    <div class="min-w-max origin-top-left" :style="{ transform: `scale(${zoom})`, width: `${100 / zoom}%` }">
+      <div
+        ref="canvasRef"
+        class="combo-canvas min-w-max rounded-xl bg-zinc-50 p-5 shadow-sm"
+        :style="{ '--main-card-width': `${store.mainCardWidth}px`, '--sub-card-width': `${store.subCardWidth}px` }"
+      >
+        <header class="mb-5 flex items-end justify-between border-b-2 border-zinc-900 pb-2">
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-wide text-cyan-700">YGO Combo Flow</p>
+            <h1 class="text-xl font-black text-zinc-950">{{ store.project.title }}</h1>
+          </div>
+          <p class="text-xs font-semibold text-zinc-500">{{ store.project.steps.length }} Steps</p>
+        </header>
 
-      <div class="space-y-12">
-        <section v-for="row in rows" :key="row.rowIndex" class="relative">
-          <div class="flex items-start gap-6" :class="row.direction === 'rtl' ? 'flex-row-reverse' : ''">
-            <template v-for="(item, displayIndex) in row.items" :key="item.step.id">
-              <StepNode
-                :step="item.step"
-                :step-index="item.index"
-                :direction="row.direction"
-                @open-menu="openContextMenu"
-              />
-              <div
-                v-if="displayIndex < row.items.length - 1"
-                class="flow-arrow mt-28 flex h-8 w-12 shrink-0 items-center justify-center text-zinc-600"
-                :class="row.direction === 'rtl' ? 'rotate-180' : ''"
-              >
-                <span class="h-0.5 w-10 bg-current" />
-                <span class="-ml-2 h-3 w-3 rotate-45 border-r-2 border-t-2 border-current" />
+        <div class="space-y-9">
+          <section v-for="row in rows" :key="row.rowIndex" class="relative">
+            <div
+              class="grid items-start gap-3"
+              :style="{ gridTemplateColumns: `repeat(${store.columnsPerRow}, ${stepCellWidth}px)` }"
+            >
+              <div v-for="(item, cellIndex) in row.cells" :key="`${row.rowIndex}-${cellIndex}`" class="min-h-52">
+                <StepNode
+                  v-if="item"
+                  :step="item.step"
+                  :step-index="item.index"
+                  :direction="row.direction"
+                  @open-menu="openContextMenu"
+                />
               </div>
-            </template>
-          </div>
-          <div
-            v-if="row.rowIndex < rows.length - 1"
-            class="mt-4 flex text-zinc-600"
-            :class="row.direction === 'ltr' ? 'justify-end pr-10' : 'justify-start pl-10'"
-          >
-            <div class="flex h-14 w-24 items-center justify-center rounded-full border-2 border-zinc-400 bg-white">
-              <CornerDownLeft v-if="row.direction === 'ltr'" :size="28" />
-              <CornerDownRight v-else :size="28" />
             </div>
-          </div>
-        </section>
+            <div
+              v-if="row.rowIndex < rows.length - 1"
+              class="mt-3 flex text-zinc-600"
+              :class="row.direction === 'ltr' ? 'justify-end pr-8' : 'justify-start pl-8'"
+            >
+              <div class="flex h-10 w-16 items-center justify-center rounded-full border-2 border-zinc-400 bg-white">
+                <CornerDownLeft v-if="row.direction === 'ltr'" :size="22" />
+                <CornerDownRight v-else :size="22" />
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
+
+    <button
+      class="export-hidden fixed bottom-4 left-[21rem] z-40 inline-flex h-9 items-center gap-2 rounded-full border border-zinc-300 bg-white px-3 text-xs font-black text-zinc-700 shadow-lg hover:bg-zinc-100"
+      title="重置畫布縮放"
+      @click="resetZoom"
+    >
+      <ZoomIn :size="15" />
+      {{ Math.round(zoom * 100) }}%
+      <RotateCcw :size="13" />
+    </button>
 
     <div
       v-if="contextMenu"
@@ -103,18 +170,41 @@ function runContextAction(action) {
       :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
       @click.stop
     >
-      <button class="block w-full px-3 py-2 text-left hover:bg-zinc-100" @click="runContextAction((index) => store.insertStepBefore(index))">
-        向前插入步驟
-      </button>
-      <button class="block w-full px-3 py-2 text-left hover:bg-zinc-100" @click="runContextAction((index) => store.addStep(index))">
-        向後插入步驟
-      </button>
-      <button class="block w-full px-3 py-2 text-left hover:bg-zinc-100" @click="runContextAction((index) => store.clearStep(index))">
-        清空內容
-      </button>
-      <button class="block w-full px-3 py-2 text-left text-rose-700 hover:bg-rose-50" @click="runContextAction((index) => store.deleteStep(index))">
-        刪除此步驟
-      </button>
+      <template v-if="contextMenu.kind === 'step'">
+        <button class="block w-full px-3 py-2 text-left hover:bg-zinc-100" @click="runContextAction(({ index }) => store.addStep(index))">
+          插入步驟
+        </button>
+        <button class="block w-full px-3 py-2 text-left hover:bg-zinc-100" @click="runContextAction(({ index }) => store.clearStep(index))">
+          清空內容
+        </button>
+        <button class="block w-full px-3 py-2 text-left text-rose-700 hover:bg-rose-50" @click="runContextAction(({ index }) => store.deleteStep(index))">
+          刪除此步驟
+        </button>
+      </template>
+
+      <template v-else-if="contextMenu.kind === 'material'">
+        <button class="block w-full px-3 py-2 text-left hover:bg-zinc-100" @click="runContextAction(({ index }) => store.addMaterialSlot(index))">
+          新增素材
+        </button>
+        <button class="block w-full px-3 py-2 text-left text-rose-700 hover:bg-rose-50" @click="runContextAction(({ index, slot }) => store.removeMaterialSlot(index, slot.materialIndex))">
+          刪除素材
+        </button>
+      </template>
+
+      <template v-else-if="contextMenu.kind === 'chain'">
+        <button class="block w-full px-3 py-2 text-left hover:bg-zinc-100" @click="runContextAction(({ index, slot }) => store.addChainBlock(index, slot?.chainIndex ?? null))">
+          新增連鎖發動
+        </button>
+        <button class="block w-full px-3 py-2 text-left text-rose-700 hover:bg-rose-50" @click="runContextAction(({ index, slot }) => store.removeChainBlock(index, slot?.chainIndex ?? 0))">
+          刪除連鎖發動
+        </button>
+        <button class="block w-full px-3 py-2 text-left hover:bg-zinc-100" @click="runContextAction(({ index, slot }) => store.addChainTarget(index, slot?.chainIndex ?? 0))">
+          新增連鎖效果對象
+        </button>
+        <button class="block w-full px-3 py-2 text-left text-rose-700 hover:bg-rose-50" @click="runContextAction(({ index, slot }) => store.removeChainTarget(index, slot?.chainIndex ?? 0, slot?.targetIndex ?? null))">
+          刪除連鎖效果對象
+        </button>
+      </template>
     </div>
   </div>
 </template>
