@@ -159,6 +159,8 @@ function onSlotMenu({ event, slot }) {
         class="chain-card relative shrink-0"
         :class="item.startsBlock ? 'chain-group-start' : ''"
         :style="{
+          width: `${store.subCardWidth}px`,
+          height: `${Math.round(store.subCardWidth * 1.45)}px`,
           marginTop: cardIndex === 0 ? '0' : `-${chainOverlap}px`,
           zIndex: cardIndex + 1,
         }"

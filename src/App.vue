@@ -78,6 +78,11 @@ async function exportPng() {
       pixelRatio: 2,
       cacheBust: true,
       backgroundColor: '#fafafa',
+      filter: (element) => {
+        const isEmptyCardSlot = element.classList?.contains('is-empty')
+          && (element.classList.contains('card-slot-main') || element.classList.contains('card-slot-small'))
+        return !isEmptyCardSlot
+      },
     })
     const response = await fetch(dataUrl)
     const blob = await response.blob()
