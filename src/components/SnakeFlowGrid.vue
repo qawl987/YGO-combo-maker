@@ -15,6 +15,18 @@ const panStart = ref({ x: 0, y: 0, left: 0, top: 0 })
 defineExpose({ canvasRef })
 
 const stepCellWidth = computed(() => store.mainCardWidth + store.subCardWidth + 34)
+const chainColumnWidth = computed(() => store.subCardWidth + 12)
+const rowEdgePadding = computed(() => chainColumnWidth.value + 8)
+const displayColumnCount = computed(() => Math.max(
+  1,
+  Math.min(store.columnsPerRow, store.project.steps.length),
+))
+const flowWidth = computed(() => (
+  rowEdgePadding.value
+  + displayColumnCount.value * stepCellWidth.value
+  + Math.max(0, displayColumnCount.value - 1) * 12
+))
+const canvasWidth = computed(() => flowWidth.value + 40)
 const rowHeight = computed(() => Math.max(
   Math.round(store.mainCardWidth * 1.45 + store.subCardWidth * 0.82 + 54),
   Math.round(store.subCardWidth * 3.5),
@@ -31,8 +43,8 @@ const rows = computed(() => {
       index: start + offset,
     }))
     const visualItems = direction === 'ltr' ? items : [...items].reverse()
-    const cells = Array.from({ length: rowSize }, () => null)
-    const offset = direction === 'rtl' ? rowSize - visualItems.length : 0
+    const cells = Array.from({ length: displayColumnCount.value }, () => null)
+    const offset = direction === 'rtl' ? displayColumnCount.value - visualItems.length : 0
     visualItems.forEach((item, itemIndex) => {
       cells[offset + itemIndex] = item
     })
@@ -111,11 +123,15 @@ function resetZoom() {
     @pointerup="onPointerUp"
     @pointercancel="onPointerUp"
   >
-    <div class="min-w-max origin-top-left" :style="{ transform: `scale(${zoom})`, width: `${100 / zoom}%` }">
+    <div class="w-max origin-top-left" :style="{ transform: `scale(${zoom})` }">
       <div
         ref="canvasRef"
-        class="combo-canvas min-w-max rounded-xl bg-zinc-50 p-5 shadow-sm"
-        :style="{ '--main-card-width': `${store.mainCardWidth}px`, '--sub-card-width': `${store.subCardWidth}px` }"
+        class="combo-canvas rounded-xl bg-zinc-50 p-5 shadow-sm"
+        :style="{
+          width: `${canvasWidth}px`,
+          '--main-card-width': `${store.mainCardWidth}px`,
+          '--sub-card-width': `${store.subCardWidth}px`,
+        }"
       >
         <header class="mb-5 flex items-end justify-between border-b-2 border-zinc-900 pb-2">
           <div>
@@ -125,24 +141,30 @@ function resetZoom() {
           <p class="text-xs font-semibold text-zinc-500">{{ store.project.steps.length }} Steps</p>
         </header>
 
-        <div class="flex flex-col gap-9">
+        <div class="flex flex-col gap-4">
           <section
             v-for="row in rows"
             :key="row.rowIndex"
             class="relative"
-            :style="{ height: `${rowHeight}px` }"
+            :style="{ width: `${flowWidth}px`, height: `${rowHeight}px` }"
           >
             <div
               v-if="row.rowIndex > 0"
-              class="pointer-events-none absolute -top-7 z-20 flex h-6 items-center text-zinc-500"
-              :class="row.rowIndex % 2 === 0 ? 'left-1' : 'right-1'"
+              class="pointer-events-none absolute top-1/2 z-20 flex -translate-y-1/2 items-center justify-center text-zinc-500"
+              :class="row.rowIndex % 2 === 0 ? 'left-0' : 'right-0'"
+              :style="{ width: `${rowEdgePadding}px` }"
             >
               <ArrowRight v-if="row.rowIndex % 2 === 0" :size="24" :stroke-width="1.75" />
               <ArrowLeft v-else :size="24" :stroke-width="1.75" />
             </div>
             <div
               class="grid h-full items-start gap-3"
-              :style="{ gridTemplateColumns: `repeat(${store.columnsPerRow}, ${stepCellWidth}px)` }"
+              :style="{
+                width: `${flowWidth}px`,
+                paddingLeft: row.direction === 'ltr' ? `${rowEdgePadding}px` : '0',
+                paddingRight: row.direction === 'rtl' ? `${rowEdgePadding}px` : '0',
+                gridTemplateColumns: `repeat(${displayColumnCount}, ${stepCellWidth}px)`,
+              }"
             >
               <div
                 v-for="(item, cellIndex) in row.cells"

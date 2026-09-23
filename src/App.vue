@@ -69,6 +69,7 @@ async function exportPng() {
   if (!node) return
   exporting.value = true
   document.body.classList.add('is-exporting')
+  node.classList.add('is-exporting')
   let restoreImages = () => {}
   await nextTick()
   try {
@@ -88,6 +89,7 @@ async function exportPng() {
   } finally {
     restoreImages()
     document.body.classList.remove('is-exporting')
+    node.classList.remove('is-exporting')
     exporting.value = false
   }
 }

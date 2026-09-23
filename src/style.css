@@ -38,19 +38,28 @@ button:disabled {
   box-shadow: none;
 }
 
-.is-exporting .card-slot-small.is-empty {
+.is-exporting .card-slot-small.is-empty,
+.combo-canvas.is-exporting .card-slot-small.is-empty {
   border-color: transparent !important;
   background: transparent !important;
   box-shadow: none !important;
 }
 
-.is-exporting .card-slot-small.is-empty .empty-slot-label {
-  opacity: 0;
+.is-exporting .card-slot-small.is-empty .empty-slot-label,
+.combo-canvas.is-exporting .card-slot-small.is-empty .empty-slot-label {
+  background: transparent !important;
+  color: transparent !important;
+  opacity: 0 !important;
 }
 
 .card-slot-main,
 .card-slot-small {
   appearance: none;
+}
+
+.material-role-select {
+  appearance: none;
+  background-image: none;
 }
 
 .flow-arrow {

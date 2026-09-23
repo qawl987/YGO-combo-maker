@@ -102,7 +102,7 @@ function onSlotMenu({ event, slot }) {
           placeholder="動作"
         >
       </div>
-      <div class="export-only mb-2 hidden h-8 items-center rounded bg-zinc-900 px-2 text-xs font-bold text-white">
+      <div class="export-only mb-2 hidden h-7 items-center rounded bg-zinc-900 px-2 text-xs font-bold text-white">
         {{ step.actionType === 'CUSTOM' ? (step.customActionText || '自訂') : actionOptions.find((item) => item.value === step.actionType)?.label }}
       </div>
       <CardSlot :card="step.mainCard" :slot="mainSlot()" label="主卡" size="main" @slot-menu="onSlotMenu" />
@@ -116,6 +116,7 @@ function onSlotMenu({ event, slot }) {
           :key="slot.id"
           class="relative shrink-0"
           :style="{
+            width: `${store.subCardWidth}px`,
             marginLeft: materialIndex === 0 ? '0' : `-${materialOverlap}px`,
             zIndex: materialIndex + 1,
           }"
@@ -123,7 +124,7 @@ function onSlotMenu({ event, slot }) {
           <CardSlot :card="slot.card" :slot="materialSlot(materialIndex)" :label="roleLabel(slot)" size="small" @slot-menu="onSlotMenu" />
           <select
             v-model="slot.role"
-            class="export-hidden mt-1 h-6 w-full rounded border border-zinc-300 bg-white px-1 text-[10px] font-semibold text-zinc-700"
+            class="material-role-select export-hidden mt-1 h-6 w-full rounded border border-zinc-300 bg-white px-1 text-center text-[10px] font-semibold text-zinc-700"
           >
             <option v-for="option in roleOptions" :key="option.value" :value="option.value">
               {{ option.label }}
