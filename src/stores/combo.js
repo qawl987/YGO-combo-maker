@@ -48,7 +48,7 @@ function newChainBlock() {
 function newStep() {
   return {
     id: uid('step'),
-    actionType: 'NORMAL_SUMMON',
+    actionType: 'SPECIAL_SUMMON',
     customActionText: '',
     mainCard: null,
     materials: [newSubCardSlot(), newSubCardSlot()],
