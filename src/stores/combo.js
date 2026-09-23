@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { getCardImage, getCdnImageUrl } from '../services/cardImages'
 
 const STORAGE_KEY = 'ygo-combo-builder:draft'
+const SAVED_FLOWS_KEY = 'ygo-combo-builder:saved-flows'
 
 export const actionOptions = [
   { value: 'NORMAL_SUMMON', label: '通召' },
@@ -104,12 +105,25 @@ function stripRuntimeImageUrls(project) {
   return cleaned
 }
 
+function projectToFlow(project, id = uid('flow')) {
+  const normalized = stripRuntimeImageUrls(project)
+  return {
+    id,
+    version: normalized.version,
+    title: normalized.title,
+    gridSettings: normalized.gridSettings,
+    steps: normalized.steps,
+  }
+}
+
 export const useComboStore = defineStore('combo', () => {
   const project = ref(createDefaultProject())
   const selectedCard = ref(null)
   const activeSlot = ref(null)
   const statusMessage = ref('')
   const isLoadingCard = ref(false)
+  const savedFlows = ref([])
+  const activeSavedFlowId = ref(null)
 
   const columnsPerRow = computed(() => Number(project.value.gridSettings.columnsPerRow) || 4)
   const mainCardWidth = computed(() => Number(project.value.gridSettings.mainCardWidth) || 140)
@@ -130,6 +144,33 @@ export const useComboStore = defineStore('combo', () => {
       imageUrl: await getCardImage(card.passcode),
       customName: card.customName || '',
     }
+  }
+
+  async function hydrateStep(step) {
+    const hydrated = {
+      ...newStep(),
+      ...step,
+      materials: step.materials?.length ? step.materials : [newSubCardSlot(), newSubCardSlot()],
+      chainEffects: step.chainEffects?.length ? step.chainEffects : [newChainBlock()],
+    }
+    hydrated.mainCard = await hydrateCard(step.mainCard)
+    hydrated.materials = await Promise.all(hydrated.materials.map(async (slot) => ({
+      ...newSubCardSlot(),
+      ...slot,
+      card: await hydrateCard(slot.card),
+    })))
+    hydrated.chainEffects = await Promise.all(hydrated.chainEffects.map(async (block) => ({
+      ...newChainBlock(),
+      ...block,
+      sourceCard: await hydrateCard(block.sourceCard),
+      targetCards: await Promise.all(
+        (block.targetCards || [{ id: uid('target'), card: block.targetCard || null }]).map(async (target) => ({
+          id: target.id || uid('target'),
+          card: await hydrateCard(target.card),
+        })),
+      ),
+    })))
+    return hydrated
   }
 
   async function addCardByPasscode(passcode) {
@@ -195,6 +236,11 @@ export const useComboStore = defineStore('combo', () => {
     project.value.steps.splice(afterIndex + 1, 0, newStep())
   }
 
+  function addSteps(afterIndex, count) {
+    const steps = Array.from({ length: count }, () => newStep())
+    project.value.steps.splice(afterIndex + 1, 0, ...steps)
+  }
+
   function deleteStep(index) {
     if (project.value.steps.length <= 1) {
       project.value.steps[0] = newStep()
@@ -257,14 +303,57 @@ export const useComboStore = defineStore('combo', () => {
     targets.splice(removeIndex, 1)
   }
 
+  function persistSavedFlows() {
+    localStorage.setItem(SAVED_FLOWS_KEY, JSON.stringify({
+      flows: savedFlows.value,
+      activeSavedFlowId: activeSavedFlowId.value,
+    }))
+  }
+
+  function syncActiveFlow() {
+    if (!activeSavedFlowId.value) return
+    const index = savedFlows.value.findIndex((flow) => flow.id === activeSavedFlowId.value)
+    if (index < 0) return
+    savedFlows.value[index] = projectToFlow(project.value, activeSavedFlowId.value)
+  }
+
   function saveDraft() {
+    syncActiveFlow()
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stripRuntimeImageUrls(project.value)))
+    persistSavedFlows()
   }
 
   async function loadDraft() {
+    const savedRaw = localStorage.getItem(SAVED_FLOWS_KEY)
+    let savedActiveId = null
+    if (savedRaw) {
+      const savedPayload = JSON.parse(savedRaw)
+      savedFlows.value = Array.isArray(savedPayload) ? savedPayload : (savedPayload.flows || [])
+      savedActiveId = Array.isArray(savedPayload) ? null : savedPayload.activeSavedFlowId
+    }
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return
-    await importProject(JSON.parse(raw), false)
+    const hasSavedActiveFlow = savedFlows.value.some((flow) => flow.id === savedActiveId)
+
+    if (raw) {
+      await importProject(JSON.parse(raw), false)
+      if (hasSavedActiveFlow) {
+        activeSavedFlowId.value = savedActiveId
+      } else {
+        const flow = projectToFlow(project.value)
+        savedFlows.value.push(flow)
+        activeSavedFlowId.value = flow.id
+      }
+    } else if (hasSavedActiveFlow) {
+      await loadSavedFlow(savedActiveId, false)
+    } else if (savedFlows.value.length) {
+      await loadSavedFlow(savedFlows.value[0].id, false)
+    } else {
+      const flow = projectToFlow(project.value)
+      savedFlows.value.push(flow)
+      activeSavedFlowId.value = flow.id
+    }
+
+    saveDraft()
   }
 
   function exportProject() {
@@ -285,45 +374,109 @@ export const useComboStore = defineStore('combo', () => {
 
     next.library = (await Promise.all(next.library.map(hydrateCard))).filter(Boolean)
 
-    const hydrateStep = async (step) => {
-      const hydrated = {
-        ...newStep(),
-        ...step,
-        materials: step.materials?.length ? step.materials : [newSubCardSlot(), newSubCardSlot()],
-        chainEffects: step.chainEffects?.length ? step.chainEffects : [newChainBlock()],
-      }
-      hydrated.mainCard = await hydrateCard(step.mainCard)
-      hydrated.materials = await Promise.all(hydrated.materials.map(async (slot) => ({
-        ...newSubCardSlot(),
-        ...slot,
-        card: await hydrateCard(slot.card),
-      })))
-      hydrated.chainEffects = await Promise.all(hydrated.chainEffects.map(async (block) => ({
-        ...newChainBlock(),
-        ...block,
-        sourceCard: await hydrateCard(block.sourceCard),
-        targetCards: await Promise.all(
-          (block.targetCards || [{ id: uid('target'), card: block.targetCard || null }]).map(async (target) => ({
-            id: target.id || uid('target'),
-            card: await hydrateCard(target.card),
-          })),
-        ),
-      })))
-      return hydrated
-    }
-
     next.steps = await Promise.all(next.steps.map(hydrateStep))
     project.value = next
+    activeSavedFlowId.value = null
     activeSlot.value = null
     selectedCard.value = null
-    if (announce) setStatus('專案已匯入')
+    if (announce) {
+      const flow = projectToFlow(project.value)
+      savedFlows.value.push(flow)
+      activeSavedFlowId.value = flow.id
+      saveDraft()
+      setStatus('專案已匯入')
+    }
   }
 
-  function resetProject() {
-    project.value = createDefaultProject()
-    activeSlot.value = null
+  function clearLibrary() {
+    project.value.library = []
     selectedCard.value = null
-    setStatus('已建立空白專案')
+    setStatus('素材庫已清空')
+  }
+
+  function nextUntitledFlowName() {
+    const titles = new Set(savedFlows.value.map((flow) => flow.title))
+    if (!titles.has('未命名展開')) return '未命名展開'
+    let suffix = 1
+    while (titles.has(`未命名展開(${suffix})`)) suffix += 1
+    return `未命名展開(${suffix})`
+  }
+
+  function createBlankFlow() {
+    const library = project.value.library
+    const nextProject = createDefaultProject()
+    nextProject.title = nextUntitledFlowName()
+    nextProject.library = library
+    project.value = nextProject
+    const flow = projectToFlow(nextProject)
+    savedFlows.value.push(flow)
+    activeSavedFlowId.value = flow.id
+    activeSlot.value = null
+    saveDraft()
+    setStatus('已新增空白畫布')
+  }
+
+  async function loadSavedFlow(flowId, announce = true) {
+    const flow = savedFlows.value.find((item) => item.id === flowId)
+    if (!flow) return
+    const library = project.value.library
+    const selected = selectedCard.value
+    activeSavedFlowId.value = null
+    await importProject({ ...cloneProject(flow), library }, false)
+    project.value.library = library
+    selectedCard.value = selected
+    activeSavedFlowId.value = flow.id
+    persistSavedFlows()
+    if (announce) setStatus(`已切換至 ${flow.title}`)
+  }
+
+  function duplicateSavedFlow(flowId) {
+    const source = savedFlows.value.find((flow) => flow.id === flowId)
+    if (!source) return
+    const duplicate = {
+      ...cloneProject(source),
+      id: uid('flow'),
+      title: nextUntitledFlowName(),
+    }
+    savedFlows.value.push(duplicate)
+    persistSavedFlows()
+    setStatus(`已複製為 ${duplicate.title}`)
+  }
+
+  async function deleteSavedFlow(flowId) {
+    const index = savedFlows.value.findIndex((flow) => flow.id === flowId)
+    if (index < 0) return
+    const wasActive = activeSavedFlowId.value === flowId
+    savedFlows.value.splice(index, 1)
+    if (wasActive) {
+      activeSavedFlowId.value = null
+      const nextFlow = savedFlows.value[Math.min(index, savedFlows.value.length - 1)]
+      if (nextFlow) {
+        await loadSavedFlow(nextFlow.id, false)
+      } else {
+        createBlankFlow()
+      }
+    } else {
+      persistSavedFlows()
+    }
+    setStatus('已刪除一圖')
+  }
+
+  function renameSavedFlow(flowId, title) {
+    const nextTitle = String(title).trim()
+    if (!nextTitle) return
+    const flow = savedFlows.value.find((item) => item.id === flowId)
+    if (!flow) return
+    flow.title = nextTitle
+    if (activeSavedFlowId.value === flowId) project.value.title = nextTitle
+    persistSavedFlows()
+  }
+
+  function syncActiveFlowTitle() {
+    const title = String(project.value.title).trim() || '未命名展開'
+    project.value.title = title
+    syncActiveFlow()
+    persistSavedFlows()
   }
 
   return {
@@ -332,6 +485,8 @@ export const useComboStore = defineStore('combo', () => {
     activeSlot,
     statusMessage,
     isLoadingCard,
+    savedFlows,
+    activeSavedFlowId,
     columnsPerRow,
     mainCardWidth,
     subCardWidth,
@@ -342,6 +497,7 @@ export const useComboStore = defineStore('combo', () => {
     pasteSelectedCard,
     clearActiveSlot,
     addStep,
+    addSteps,
     deleteStep,
     clearStep,
     addMaterialSlot,
@@ -354,7 +510,13 @@ export const useComboStore = defineStore('combo', () => {
     loadDraft,
     exportProject,
     importProject,
-    resetProject,
+    clearLibrary,
+    createBlankFlow,
+    loadSavedFlow,
+    duplicateSavedFlow,
+    deleteSavedFlow,
+    renameSavedFlow,
+    syncActiveFlowTitle,
     setStatus,
   }
 })

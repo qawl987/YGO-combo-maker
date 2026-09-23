@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { ArrowLeft, ArrowRight, RotateCcw, ZoomIn } from '@lucide/vue'
 import StepNode from './StepNode.vue'
 import { useComboStore } from '../stores/combo'
@@ -11,6 +11,9 @@ const contextMenu = ref(null)
 const zoom = ref(1)
 const isPanning = ref(false)
 const panStart = ref({ x: 0, y: 0, left: 0, top: 0 })
+const editingTitle = ref(false)
+const titleInputRef = ref(null)
+const originalTitle = ref('')
 
 defineExpose({ canvasRef })
 
@@ -109,6 +112,24 @@ function onPointerUp(event) {
 function resetZoom() {
   zoom.value = 1
 }
+
+async function startTitleEdit() {
+  originalTitle.value = store.project.title
+  editingTitle.value = true
+  await nextTick()
+  titleInputRef.value?.focus()
+  titleInputRef.value?.select()
+}
+
+function finishTitleEdit() {
+  editingTitle.value = false
+  store.syncActiveFlowTitle()
+}
+
+function cancelTitleEdit() {
+  store.project.title = originalTitle.value
+  editingTitle.value = false
+}
 </script>
 
 <template>
@@ -136,7 +157,21 @@ function resetZoom() {
         <header class="mb-5 flex items-end justify-between border-b-2 border-zinc-900 pb-2">
           <div>
             <p class="text-[10px] font-bold uppercase tracking-wide text-cyan-700">YGO Combo Flow</p>
-            <h1 class="text-xl font-black text-zinc-950">{{ store.project.title }}</h1>
+            <div class="export-hidden h-7">
+              <input
+                v-if="editingTitle"
+                ref="titleInputRef"
+                v-model="store.project.title"
+                class="h-7 min-w-52 border-b-2 border-cyan-600 bg-transparent text-xl font-black text-zinc-950 outline-none"
+                @blur="finishTitleEdit"
+                @keydown.enter.prevent="finishTitleEdit"
+                @keydown.escape.prevent="cancelTitleEdit"
+              >
+              <button v-else class="h-7 text-xl font-black text-zinc-950 hover:text-cyan-700" title="修改一圖名" @click="startTitleEdit">
+                {{ store.project.title }}
+              </button>
+            </div>
+            <h1 class="export-only hidden h-7 items-center text-xl font-black text-zinc-950">{{ store.project.title }}</h1>
           </div>
           <p class="text-xs font-semibold text-zinc-500">{{ store.project.steps.length }} Steps</p>
         </header>
@@ -149,7 +184,6 @@ function resetZoom() {
             :style="{ width: `${flowWidth}px`, height: `${rowHeight}px` }"
           >
             <div
-              v-if="row.rowIndex > 0"
               class="pointer-events-none absolute top-1/2 z-20 flex -translate-y-1/2 items-center justify-center text-zinc-500"
               :class="row.rowIndex % 2 === 0 ? 'left-0' : 'right-0'"
               :style="{ width: `${rowEdgePadding}px` }"
@@ -205,6 +239,9 @@ function resetZoom() {
       <template v-if="contextMenu.kind === 'step'">
         <button class="block w-full px-3 py-2 text-left hover:bg-zinc-100" @click="runContextAction(({ index }) => store.addStep(index))">
           插入步驟
+        </button>
+        <button class="block w-full px-3 py-2 text-left hover:bg-zinc-100" @click="runContextAction(({ index }) => store.addSteps(index, 10))">
+          插入 10 步驟
         </button>
         <button class="block w-full px-3 py-2 text-left hover:bg-zinc-100" @click="runContextAction(({ index }) => store.clearStep(index))">
           清空內容
