@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { CornerDownLeft, CornerDownRight, RotateCcw, ZoomIn } from '@lucide/vue'
+import { ArrowLeft, ArrowRight, RotateCcw, ZoomIn } from '@lucide/vue'
 import StepNode from './StepNode.vue'
 import { useComboStore } from '../stores/combo'
 
@@ -14,8 +14,10 @@ const panStart = ref({ x: 0, y: 0, left: 0, top: 0 })
 
 defineExpose({ canvasRef })
 
-const stepCellWidth = computed(() => (
-  store.mainCardWidth + store.subCardWidth * 2 + Number(store.project.gridSettings.gapColumnWidth || 44) + 56
+const stepCellWidth = computed(() => store.mainCardWidth + store.subCardWidth + 34)
+const rowHeight = computed(() => Math.max(
+  Math.round(store.mainCardWidth * 1.45 + store.subCardWidth * 0.82 + 54),
+  Math.round(store.subCardWidth * 3.5),
 ))
 
 const rows = computed(() => {
@@ -123,30 +125,38 @@ function resetZoom() {
           <p class="text-xs font-semibold text-zinc-500">{{ store.project.steps.length }} Steps</p>
         </header>
 
-        <div class="space-y-9">
-          <section v-for="row in rows" :key="row.rowIndex" class="relative">
+        <div class="flex flex-col gap-9">
+          <section
+            v-for="row in rows"
+            :key="row.rowIndex"
+            class="relative"
+            :style="{ height: `${rowHeight}px` }"
+          >
             <div
-              class="grid items-start gap-3"
+              v-if="row.rowIndex > 0"
+              class="pointer-events-none absolute -top-7 z-20 flex h-6 items-center text-zinc-500"
+              :class="row.rowIndex % 2 === 0 ? 'left-1' : 'right-1'"
+            >
+              <ArrowRight v-if="row.rowIndex % 2 === 0" :size="24" :stroke-width="1.75" />
+              <ArrowLeft v-else :size="24" :stroke-width="1.75" />
+            </div>
+            <div
+              class="grid h-full items-start gap-3"
               :style="{ gridTemplateColumns: `repeat(${store.columnsPerRow}, ${stepCellWidth}px)` }"
             >
-              <div v-for="(item, cellIndex) in row.cells" :key="`${row.rowIndex}-${cellIndex}`" class="min-h-52">
+              <div
+                v-for="(item, cellIndex) in row.cells"
+                :key="`${row.rowIndex}-${cellIndex}`"
+                class="h-full"
+              >
                 <StepNode
                   v-if="item"
                   :step="item.step"
                   :step-index="item.index"
                   :direction="row.direction"
+                  :row-height="rowHeight"
                   @open-menu="openContextMenu"
                 />
-              </div>
-            </div>
-            <div
-              v-if="row.rowIndex < rows.length - 1"
-              class="mt-3 flex text-zinc-600"
-              :class="row.direction === 'ltr' ? 'justify-end pr-8' : 'justify-start pl-8'"
-            >
-              <div class="flex h-10 w-16 items-center justify-center rounded-full border-2 border-zinc-400 bg-white">
-                <CornerDownLeft v-if="row.direction === 'ltr'" :size="22" />
-                <CornerDownRight v-else :size="22" />
               </div>
             </div>
           </section>

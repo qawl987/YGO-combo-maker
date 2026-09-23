@@ -62,6 +62,7 @@ function onContextMenu(event) {
     :class="[
       isActive ? 'border-cyan-500 ring-2 ring-cyan-300' : 'border-zinc-300 hover:border-zinc-500',
       size === 'main' ? 'card-slot-main' : 'card-slot-small',
+      !card ? 'is-empty' : '',
       compact ? 'shadow-none' : '',
     ]"
     :style="dimensions"
@@ -79,7 +80,7 @@ function onContextMenu(event) {
       class="pointer-events-none h-full w-full object-cover"
       draggable="false"
     >
-    <span v-else class="pointer-events-none flex h-full w-full items-center justify-center bg-zinc-100 px-2 text-center text-[11px] font-medium text-zinc-500">
+    <span v-else class="empty-slot-label pointer-events-none flex h-full w-full items-center justify-center bg-zinc-100 px-2 text-center text-[11px] font-medium text-zinc-500">
       {{ label || '放入卡片' }}
     </span>
     <span

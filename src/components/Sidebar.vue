@@ -93,7 +93,7 @@ function triggerImport() {
         <label class="text-xs font-bold text-zinc-600">專案名稱</label>
         <input v-model="store.project.title" class="mt-1 h-10 w-full rounded-md border border-zinc-300 px-3 text-sm font-semibold" />
 
-        <div class="mt-4 grid grid-cols-3 gap-2">
+        <div class="mt-4 grid grid-cols-2 gap-2">
           <label class="text-xs font-bold text-zinc-600">
             每列
             <input v-model.number="store.project.gridSettings.columnsPerRow" min="2" max="6" type="number" class="mt-1 h-9 w-full rounded border border-zinc-300 px-2">
@@ -101,10 +101,6 @@ function triggerImport() {
           <label class="text-xs font-bold text-zinc-600">
             主卡
             <input v-model.number="store.project.gridSettings.mainCardWidth" min="72" max="180" type="number" class="mt-1 h-9 w-full rounded border border-zinc-300 px-2">
-          </label>
-          <label class="text-xs font-bold text-zinc-600">
-            間距
-            <input v-model.number="store.project.gridSettings.gapColumnWidth" min="24" max="180" type="number" class="mt-1 h-9 w-full rounded border border-zinc-300 px-2">
           </label>
         </div>
 
