@@ -80,7 +80,9 @@ async function exportPng() {
       backgroundColor: '#fafafa',
       filter: (element) => {
         const isEmptyCardSlot = element.classList?.contains('is-empty')
-          && (element.classList.contains('card-slot-main') || element.classList.contains('card-slot-small'))
+          && (element.classList.contains('card-slot-main')
+            || element.classList.contains('card-slot-small')
+            || element.classList.contains('card-slot-overview'))
         return !isEmptyCardSlot
       },
     })

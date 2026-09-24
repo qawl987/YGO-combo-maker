@@ -15,7 +15,9 @@ const emit = defineEmits(['slot-menu'])
 const store = useComboStore()
 
 const dimensions = computed(() => {
-  const width = props.size === 'main' ? store.mainCardWidth : store.subCardWidth
+  const width = props.size === 'main'
+    ? store.mainCardWidth
+    : props.size === 'overview' ? 36 : store.subCardWidth
   return {
     width: `${width}px`,
     height: `${Math.round(width * 1.45)}px`,
@@ -61,7 +63,7 @@ function onContextMenu(event) {
     class="group relative block shrink-0 overflow-hidden rounded-md border bg-white text-left shadow-sm transition"
     :class="[
       isActive ? 'border-cyan-500 ring-2 ring-cyan-300' : 'border-zinc-300 hover:border-zinc-500',
-      size === 'main' ? 'card-slot-main' : 'card-slot-small',
+      size === 'main' ? 'card-slot-main' : size === 'overview' ? 'card-slot-overview' : 'card-slot-small',
       !card ? 'is-empty' : '',
       compact ? 'shadow-none' : '',
     ]"

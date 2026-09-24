@@ -2,6 +2,7 @@
 import { computed, nextTick, ref } from 'vue'
 import { ArrowLeft, ArrowRight, RotateCcw, ZoomIn } from '@lucide/vue'
 import StepNode from './StepNode.vue'
+import FlowOverview from './FlowOverview.vue'
 import { useComboStore } from '../stores/combo'
 
 const store = useComboStore()
@@ -154,8 +155,8 @@ function cancelTitleEdit() {
           '--sub-card-width': `${store.subCardWidth}px`,
         }"
       >
-        <header class="mb-5 flex items-end justify-between border-b-2 border-zinc-900 pb-2">
-          <div>
+        <header class="mb-5 flex items-end gap-3 border-b-2 border-zinc-900 pb-2">
+          <div class="shrink-0">
             <p class="text-[10px] font-bold uppercase tracking-wide text-cyan-700">YGO Combo Flow</p>
             <div class="export-hidden h-7">
               <input
@@ -173,7 +174,8 @@ function cancelTitleEdit() {
             </div>
             <h1 class="export-only hidden h-7 items-center text-xl font-black text-zinc-950">{{ store.project.title }}</h1>
           </div>
-          <p class="text-xs font-semibold text-zinc-500">{{ store.project.steps.length }} Steps</p>
+          <FlowOverview @open-menu="openContextMenu" />
+          <p class="shrink-0 text-xs font-semibold text-zinc-500">{{ store.project.steps.length }} Steps</p>
         </header>
 
         <div class="flex flex-col gap-4">
@@ -272,6 +274,19 @@ function cancelTitleEdit() {
         </button>
         <button class="block w-full px-3 py-2 text-left text-rose-700 hover:bg-rose-50" @click="runContextAction(({ index, slot }) => store.removeChainTarget(index, slot?.chainIndex ?? 0, slot?.targetIndex ?? null))">
           刪除連鎖效果對象
+        </button>
+      </template>
+
+      <template v-else-if="contextMenu.kind === 'overview'">
+        <button class="block w-full px-3 py-2 text-left hover:bg-zinc-100" @click="runContextAction(({ slot }) => store.addOverviewSlot(slot.group, slot.slotIndex))">
+          新增卡格
+        </button>
+        <button
+          class="block w-full px-3 py-2 text-left text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+          :disabled="contextMenu.slot.slotIndex === null"
+          @click="runContextAction(({ slot }) => store.removeOverviewSlot(slot.group, slot.slotIndex))"
+        >
+          刪除卡格
         </button>
       </template>
     </div>

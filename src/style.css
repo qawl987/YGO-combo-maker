@@ -39,6 +39,7 @@ button:disabled {
 }
 
 .is-exporting .card-slot-small.is-empty,
+.is-exporting .card-slot-overview.is-empty,
 .combo-canvas.is-exporting .card-slot-small.is-empty {
   border-color: transparent !important;
   background: transparent !important;
@@ -46,6 +47,7 @@ button:disabled {
 }
 
 .is-exporting .card-slot-small.is-empty .empty-slot-label,
+.is-exporting .card-slot-overview.is-empty .empty-slot-label,
 .combo-canvas.is-exporting .card-slot-small.is-empty .empty-slot-label {
   background: transparent !important;
   color: transparent !important;
@@ -53,7 +55,8 @@ button:disabled {
 }
 
 .card-slot-main,
-.card-slot-small {
+.card-slot-small,
+.card-slot-overview {
   appearance: none;
 }
 

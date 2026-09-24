@@ -45,6 +45,22 @@ function newChainBlock() {
   }
 }
 
+function newOverviewSlot() {
+  return {
+    id: uid('overview'),
+    card: null,
+  }
+}
+
+function createDefaultOverview() {
+  return {
+    starters: [newOverviewSlot()],
+    garnets: [newOverviewSlot()],
+    endBoard: Array.from({ length: 6 }, () => newOverviewSlot()),
+    endBoardNote: '',
+  }
+}
+
 function newStep() {
   return {
     id: uid('step'),
@@ -66,8 +82,9 @@ function createDefaultProject() {
       subCardRatio: 0.5,
       gapColumnWidth: 44,
     },
+    overview: createDefaultOverview(),
     library: [],
-    steps: [newStep(), newStep(), newStep(), newStep()],
+    steps: [newStep(), newStep(), newStep(), newStep(), newStep()],
   }
 }
 
@@ -87,6 +104,13 @@ function stripRuntimeImageUrls(project) {
   }
 
   cleaned.library = cleaned.library.map(normalizeCard)
+  cleaned.overview ||= createDefaultOverview()
+  for (const group of ['starters', 'garnets', 'endBoard']) {
+    cleaned.overview[group] = (cleaned.overview[group] || []).map((slot) => ({
+      ...slot,
+      card: normalizeCard(slot.card),
+    }))
+  }
   cleaned.steps.forEach((step) => {
     step.mainCard = normalizeCard(step.mainCard)
     step.materials.forEach((slot) => {
@@ -112,6 +136,7 @@ function projectToFlow(project, id = uid('flow')) {
     version: normalized.version,
     title: normalized.title,
     gridSettings: normalized.gridSettings,
+    overview: normalized.overview,
     steps: normalized.steps,
   }
 }
@@ -173,6 +198,24 @@ export const useComboStore = defineStore('combo', () => {
     return hydrated
   }
 
+  async function hydrateOverview(overview) {
+    const defaults = createDefaultOverview()
+    const source = overview || {}
+    const hydrated = {
+      endBoardNote: source.endBoardNote || '',
+    }
+
+    for (const group of ['starters', 'garnets', 'endBoard']) {
+      const slots = Array.isArray(source[group]) ? source[group] : defaults[group]
+      hydrated[group] = await Promise.all(slots.map(async (slot) => ({
+        id: slot.id || uid('overview'),
+        card: await hydrateCard(slot.card),
+      })))
+    }
+
+    return hydrated
+  }
+
   async function addCardByPasscode(passcode) {
     const rawPasscode = String(passcode).trim()
     if (!/^\d{1,8}$/.test(rawPasscode)) {
@@ -204,6 +247,12 @@ export const useComboStore = defineStore('combo', () => {
 
   function setSlotCard(slot, card) {
     if (!slot) return
+    if (slot.type === 'overview') {
+      const overviewSlot = project.value.overview?.[slot.group]?.[slot.slotIndex]
+      if (overviewSlot) overviewSlot.card = card
+      return
+    }
+
     const step = project.value.steps[slot.stepIndex]
     if (!step) return
 
@@ -303,6 +352,19 @@ export const useComboStore = defineStore('combo', () => {
     targets.splice(removeIndex, 1)
   }
 
+  function addOverviewSlot(group, afterIndex = null) {
+    const slots = project.value.overview?.[group]
+    if (!Array.isArray(slots)) return
+    const insertAt = afterIndex === null ? slots.length : afterIndex + 1
+    slots.splice(insertAt, 0, newOverviewSlot())
+  }
+
+  function removeOverviewSlot(group, slotIndex) {
+    const slots = project.value.overview?.[group]
+    if (!Array.isArray(slots) || slotIndex < 0 || slotIndex >= slots.length) return
+    slots.splice(slotIndex, 1)
+  }
+
   function persistSavedFlows() {
     localStorage.setItem(SAVED_FLOWS_KEY, JSON.stringify({
       flows: savedFlows.value,
@@ -368,11 +430,13 @@ export const useComboStore = defineStore('combo', () => {
         ...createDefaultProject().gridSettings,
         ...(payload.gridSettings || {}),
       },
+      overview: payload.overview || createDefaultOverview(),
       library: payload.library || [],
       steps: payload.steps?.length ? payload.steps : [newStep()],
     }
 
     next.library = (await Promise.all(next.library.map(hydrateCard))).filter(Boolean)
+    next.overview = await hydrateOverview(next.overview)
 
     next.steps = await Promise.all(next.steps.map(hydrateStep))
     project.value = next
@@ -506,6 +570,8 @@ export const useComboStore = defineStore('combo', () => {
     removeChainBlock,
     addChainTarget,
     removeChainTarget,
+    addOverviewSlot,
+    removeOverviewSlot,
     saveDraft,
     loadDraft,
     exportProject,
