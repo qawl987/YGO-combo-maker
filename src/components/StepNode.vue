@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { ChevronDown } from '@lucide/vue'
 import CardSlot from './CardSlot.vue'
 import { actionOptions, roleOptions, useComboStore } from '../stores/combo'
 
@@ -89,20 +90,42 @@ function onSlotMenu({ event, slot }) {
       :style="{ width: `${store.mainCardWidth + 14}px` }"
       @contextmenu.prevent.stop="onContextMenu"
     >
-      <div class="export-hidden mb-2 flex items-center gap-2">
-        <select v-model="step.actionType" class="h-7 min-w-16 rounded border border-zinc-300 bg-white px-1.5 text-[11px] font-semibold text-zinc-800">
+      <div class="export-hidden relative mb-2 h-7">
+        <select
+          v-if="step.actionType !== 'CUSTOM'"
+          v-model="step.actionType"
+          class="h-7 w-full rounded border border-zinc-300 bg-white px-1.5 text-[11px] font-semibold text-zinc-800"
+        >
           <option v-for="option in actionOptions" :key="option.value" :value="option.value">
             {{ option.label }}
           </option>
         </select>
-        <input
-          v-if="step.actionType === 'CUSTOM'"
-          v-model="step.customActionText"
-          class="h-7 w-20 rounded border border-zinc-300 px-2 text-xs"
-          placeholder="動作"
-        >
+        <template v-else>
+          <textarea
+            v-model="step.customActionText"
+            rows="2"
+            class="h-7 w-full resize-none overflow-hidden rounded border border-zinc-900 bg-zinc-900 px-2 py-0.5 text-center text-xs font-bold leading-3 text-white outline-none [overflow-wrap:anywhere] focus:border-cyan-500"
+            placeholder="自訂動作"
+            title="自訂動作"
+          />
+          <select
+            v-model="step.actionType"
+            class="absolute inset-y-0 left-full z-20 ml-0.5 w-4 cursor-pointer opacity-0"
+            title="變更動作"
+          >
+            <option v-for="option in actionOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+          <ChevronDown class="pointer-events-none absolute left-full top-2 ml-1 text-zinc-600" :size="12" />
+        </template>
       </div>
-      <div class="export-only mb-2 hidden h-7 items-center rounded bg-zinc-900 px-2 text-xs font-bold text-white">
+      <div
+        class="export-only mb-2 hidden h-7 overflow-hidden rounded border border-zinc-900 bg-zinc-900 text-white"
+        :class="step.actionType === 'CUSTOM'
+          ? 'items-center justify-center whitespace-pre-wrap px-2 py-0.5 text-center text-xs font-bold leading-3 [overflow-wrap:anywhere]'
+          : 'items-center px-2 py-1 text-xs font-bold'"
+      >
         {{ step.actionType === 'CUSTOM' ? (step.customActionText || '自訂') : actionOptions.find((item) => item.value === step.actionType)?.label }}
       </div>
       <CardSlot :card="step.mainCard" :slot="mainSlot()" label="主卡" size="main" @slot-menu="onSlotMenu" />
@@ -123,6 +146,7 @@ function onSlotMenu({ event, slot }) {
         >
           <CardSlot :card="slot.card" :slot="materialSlot(materialIndex)" :label="roleLabel(slot)" size="small" @slot-menu="onSlotMenu" />
           <select
+            v-if="slot.role !== 'CUSTOM'"
             v-model="slot.role"
             class="material-role-select export-hidden mt-1 h-6 w-full rounded border border-zinc-300 bg-white px-1 text-center text-[10px] font-semibold text-zinc-700"
           >
@@ -130,15 +154,30 @@ function onSlotMenu({ event, slot }) {
               {{ option.label }}
             </option>
           </select>
-          <input
-            v-if="slot.role === 'CUSTOM'"
-            v-model="slot.customRoleText"
-            class="export-hidden mt-1 h-6 w-full rounded border border-zinc-300 px-1 text-[10px]"
-            placeholder="標籤"
-          >
+          <div v-else class="export-hidden mt-1 w-full">
+            <textarea
+              v-model="slot.customRoleText"
+              rows="2"
+              class="h-6 w-full resize-none overflow-hidden rounded border border-zinc-300 bg-white px-1 py-0.5 text-center text-[10px] font-semibold leading-[10px] text-zinc-700 outline-none [overflow-wrap:anywhere] focus:border-cyan-500"
+              placeholder="自訂"
+              title="自訂素材標籤"
+            />
+            <select
+              v-model="slot.role"
+              class="mt-0.5 h-4 w-full cursor-pointer rounded border border-zinc-300 bg-white px-0 text-center text-[8px] font-semibold text-zinc-600"
+              title="變更素材標籤"
+            >
+              <option v-for="option in roleOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </div>
           <div
             v-if="slot.card"
-            class="export-only mt-1 hidden h-6 w-full items-center justify-center rounded border border-zinc-300 bg-white px-1 text-[10px] font-semibold text-zinc-700"
+            class="export-only mt-1 hidden h-6 w-full overflow-hidden rounded border border-zinc-300 bg-white py-0.5 pl-1 text-center font-semibold text-zinc-700"
+            :class="slot.role === 'CUSTOM'
+              ? 'items-center justify-center whitespace-pre-wrap px-1 text-[10px] leading-[10px] [overflow-wrap:anywhere]'
+              : 'items-center justify-center px-1 text-[10px]'"
           >
             {{ roleLabel(slot) }}
           </div>
