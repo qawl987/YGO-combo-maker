@@ -9,15 +9,19 @@ export const actionOptions = [
   { value: 'NORMAL_SUMMON', label: '通召' },
   { value: 'SPECIAL_SUMMON', label: '特召' },
   { value: 'ACTIVATE_EFFECT', label: '發動' },
-  { value: 'SET', label: '覆蓋' },
+  { value: 'SET', label: '放置' },
   { value: 'CUSTOM', label: '自訂' },
 ]
 
 export const roleOptions = [
   { value: 'MATERIAL', label: '素材' },
-  { value: 'TARGET', label: '對象' },
   { value: 'SEARCH_TARGET', label: '檢索' },
+  { value: 'RECOVER', label: '回收' },
   { value: 'COST', label: '代價' },
+  { value: 'TARGET', label: '對象' },
+  { value: 'SEND_TO_GRAVE', label: '堆墓' },
+  { value: 'BANISH', label: '除外' },
+  { value: 'PLACE', label: '放置' },
   { value: 'CUSTOM', label: '自訂' },
 ]
 
